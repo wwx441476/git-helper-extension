@@ -81,9 +81,27 @@
       <section class="cli-section">
         <div class="cli-head">
           <span class="cli-title">终端命令</span>
-          <button type="button" id="copyCmdBtn" class="btn secondary small">复制命令</button>
+          <div class="cli-actions">
+            <button type="button" id="copyCmdBtn" class="btn secondary small">复制命令</button>
+            <button type="button" id="downloadPkgBtn" class="btn secondary small">下载软件包</button>
+          </div>
         </div>
-        <p class="cli-desc">预览中 Token 已脱敏；点击复制会写入完整 Token 环境变量，终端执行时只需修改 <code>--zip</code> 路径。</p>
+        <p class="cli-desc">预览中 Token 已脱敏。复制命令可直接粘贴执行；<strong>下载软件包</strong>可发给未安装插件的用户。</p>
+        <div class="cli-options">
+          <label class="cli-option">
+            <input type="radio" name="tokenMode" id="tokenModePlain" value="plain" />
+            <span>明文 Token（仅自用）</span>
+          </label>
+          <label class="cli-option">
+            <input type="radio" name="tokenMode" id="tokenModeEncrypt" value="encrypt" checked />
+            <span>加密 Token（分享推荐）</span>
+          </label>
+        </div>
+        <label class="field cli-password-field" id="sharePasswordField">
+          <span>分享密码</span>
+          <input type="password" id="sharePassword" placeholder="用于加密 .env 中的 Token" autocomplete="new-password" />
+          <small>下载加密包时会自动写入 .env 的 SHARE_PASSWORD；公开分享前可删除该行，私下告知密码。</small>
+        </label>
         <pre id="cliCommand" class="cli-command">加载中...</pre>
       </section>
 

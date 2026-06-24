@@ -18,6 +18,9 @@ async function parseErrorResponse(res) {
   } catch {
     detail = await res.text().catch(() => '');
   }
+  if (res.status === 401) {
+    return `${detail || 'Unauthorized'}（401：Token 无效或未正确读取，请检查 .env 中的 GITLAB_TOKEN 是否为完整 Personal Access Token，且具备 write_repository 权限）`;
+  }
   return detail || res.statusText || '请求失败';
 }
 

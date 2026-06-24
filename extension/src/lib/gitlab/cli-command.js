@@ -18,6 +18,7 @@ function shellQuote(value) {
  *   scriptPath?: string,
  *   tokenEnv?: string,
  *   token?: string,
+ *   forPackage?: boolean,
  * }} options
  */
 export function buildPathReplaceCliCommand(options) {
@@ -35,6 +36,7 @@ export function buildPathReplaceCliCommand(options) {
     scriptPath = 'scripts/gitlab-path-replace.mjs',
     tokenEnv = 'GITLAB_TOKEN',
     token = '',
+    forPackage = false,
   } = options;
 
   const tokenValue = String(token || '').trim();
@@ -42,13 +44,17 @@ export function buildPathReplaceCliCommand(options) {
     ? `${tokenEnv}=${shellQuote(tokenValue)} \\`
     : `${tokenEnv}="your-token" \\`;
 
-  const lines = [
-    'cd extension && \\',
+  /** @type {string[]} */
+  const lines = [];
+  if (!forPackage) {
+    lines.push('cd extension && \\');
+  }
+  lines.push(
     tokenLine,
     `node ${scriptPath} \\`,
     `  --zip ${shellQuote(zipPath)} \\`,
     `  --api-base ${shellQuote(apiBase)} \\`,
-  ];
+  );
 
   if (platform === 'github' || platform === 'gitee') {
     lines.push(`  --owner ${shellQuote(owner)} \\`);

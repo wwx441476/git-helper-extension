@@ -1,7 +1,9 @@
 #!/usr/bin/env node
 
-import { replaceGitlabDirectoryDirect } from '../src/lib/path-replace/index.js';
+import { replaceGitlabDirectoryDirect } from '../src/lib/path-replace/direct.js';
 import { readZipUploadFilesFromPath } from './zip-from-path.js';
+import { resolveCliTokenFromEnv, prepareCliEnv } from './env-token.js';
+import { resolveCliZipPath } from './zip-path.js';
 
 function printHelp() {
   console.log(`GitLab 目录替换 CLI（与扩展「目录替换」页面逻辑一致）
@@ -17,7 +19,8 @@ function printHelp() {
   --target <path>      远程目标目录
   --exclude <paths>    排除路径，逗号或换行分隔（相对目标路径）
   --message <text>     提交说明
-  --token <token>      Token（也可用环境变量 GITLAB_TOKEN）
+  --token <token>      Token（明文或 enc:v1: 加密；也可用环境变量 GITLAB_TOKEN）
+  --share-password <p> 解密加密 Token 的分享密码（或环境变量 SHARE_PASSWORD）
   -h, --help           显示帮助
 
 示例:
@@ -53,6 +56,7 @@ function parseArgs(argv) {
     else if (arg === '--exclude') { opts.exclude = next; i += 1; }
     else if (arg === '--message') { opts.message = next; i += 1; }
     else if (arg === '--token') { opts.token = next; i += 1; }
+    else if (arg === '--share-password') { opts.sharePassword = next; i += 1; }
     else {
       throw new Error(`未知参数: ${arg}`);
     }
@@ -69,15 +73,19 @@ async function main() {
     return;
   }
 
-  const token = String(opts.token || process.env.GITLAB_TOKEN || '').trim();
-  const zipPath = String(opts.zip || '').trim();
+  prepareCliEnv();
+
+  const token = await resolveCliTokenFromEnv(
+    'GITLAB_TOKEN',
+    String(opts.token || ''),
+    String(opts.sharePassword || ''),
+  );
   const apiBase = String(opts.apiBase || '').trim();
   const projectPath = String(opts.project || '').trim();
   const branch = String(opts.branch || '').trim();
   const targetPath = String(opts.target || '').trim();
 
   const missing = [];
-  if (!zipPath) missing.push('--zip');
   if (!apiBase) missing.push('--api-base');
   if (!projectPath) missing.push('--project');
   if (!branch) missing.push('--branch');
@@ -86,11 +94,14 @@ async function main() {
     throw new Error(`缺少必填参数: ${missing.join(', ')}（使用 --help 查看说明）`);
   }
 
+  const zipPath = await resolveCliZipPath(String(opts.zip || ''));
+
   console.log('正在扫描远程目录并提交变更...');
   console.log(`  项目: ${projectPath}`);
   console.log(`  分支: ${branch}`);
   console.log(`  目标: ${targetPath}`);
   console.log(`  ZIP:  ${zipPath}`);
+  console.log(`  Token: ${token.slice(0, 4)}****${token.slice(-4)} (${token.length} 字符)`);
 
   const relativeFiles = await readZipUploadFilesFromPath(zipPath);
 

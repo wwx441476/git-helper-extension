@@ -2,6 +2,8 @@
 
 import { replaceGiteeDirectoryDirect } from '../src/lib/gitee/path-replace.js';
 import { readZipUploadFilesFromPath } from './zip-from-path.js';
+import { resolveCliTokenFromEnv, prepareCliEnv } from './env-token.js';
+import { resolveCliZipPath } from './zip-path.js';
 
 function printHelp() {
   console.log(`Gitee 目录替换 CLI
@@ -18,7 +20,8 @@ function printHelp() {
   --target <path>    远程目标目录
   --exclude <paths>  排除路径
   --message <text>   提交说明
-  --token <token>    Token（或环境变量 GITEE_TOKEN）
+  --token <token>         Token（明文或 enc:v1:；或环境变量 GITEE_TOKEN）
+  --share-password <p>    解密加密 Token 的分享密码
   -h, --help         显示帮助
 `);
 }
@@ -39,6 +42,7 @@ function parseArgs(argv) {
     else if (arg === '--exclude') { opts.exclude = next; i += 1; }
     else if (arg === '--message') { opts.message = next; i += 1; }
     else if (arg === '--token') { opts.token = next; i += 1; }
+    else if (arg === '--share-password') { opts.sharePassword = next; i += 1; }
     else throw new Error(`未知参数: ${arg}`);
   }
   return opts;
@@ -48,8 +52,13 @@ async function main() {
   const opts = parseArgs(process.argv);
   if (opts.help) { printHelp(); return; }
 
-  const token = String(opts.token || process.env.GITEE_TOKEN || '').trim();
-  const zipPath = String(opts.zip || '').trim();
+  prepareCliEnv();
+  const token = await resolveCliTokenFromEnv(
+    'GITEE_TOKEN',
+    String(opts.token || ''),
+    String(opts.sharePassword || ''),
+  );
+  const zipPath = await resolveCliZipPath(String(opts.zip || ''));
   const relativeFiles = await readZipUploadFilesFromPath(zipPath);
 
   const result = await replaceGiteeDirectoryDirect({

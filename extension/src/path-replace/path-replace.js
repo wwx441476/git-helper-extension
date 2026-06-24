@@ -4,6 +4,7 @@ import { maskToken } from '../lib/credentials/types.js';
 import { getParseOptionsFromCredential, parseRemoteUrl, applyParsedUrl } from '../lib/repositories/parse-url.js';
 import { createRepository } from '../lib/repositories/types.js';
 import { buildPathReplaceCliCommand } from '../lib/gitlab/cli-command.js';
+import { downloadPathReplacePackage } from '../lib/path-replace/package-builder.js';
 import {
   mapLocalUploadToRemoteFiles,
   parseExcludePaths,
@@ -34,6 +35,11 @@ const submitBtn = document.getElementById('submitBtn');
 const scanBtn = document.getElementById('scanBtn');
 const cliCommandEl = document.getElementById('cliCommand');
 const copyCmdBtn = document.getElementById('copyCmdBtn');
+const downloadPkgBtn = document.getElementById('downloadPkgBtn');
+const tokenModePlainEl = document.getElementById('tokenModePlain');
+const tokenModeEncryptEl = document.getElementById('tokenModeEncrypt');
+const sharePasswordEl = document.getElementById('sharePassword');
+const sharePasswordFieldEl = document.getElementById('sharePasswordField');
 
 /** @type {{ apiBase: string, projectPath: string, defaultBranch: string, token: string, platform: string, owner: string, repo: string } | null} */
 let repoContext = null;
@@ -174,6 +180,69 @@ async function copyCliCommand() {
     setStatus(`命令已复制（含 ${getTokenEnvName(repoContext.platform)}）`, 'ok');
   } catch {
     setStatus('复制失败，请手动选中命令复制', 'err');
+  }
+}
+
+function getTokenMode() {
+  return tokenModePlainEl?.checked ? 'plain' : 'encrypt';
+}
+
+function getSharePassword() {
+  return sharePasswordEl?.value.trim() || '';
+}
+
+function updateSharePasswordField() {
+  if (!sharePasswordFieldEl) return;
+  sharePasswordFieldEl.classList.toggle('hidden', getTokenMode() === 'plain');
+}
+
+async function downloadCliPackage() {
+  if (!repoContext?.token) {
+    setStatus('无法下载：关联凭证无可用 Token', 'err');
+    return;
+  }
+
+  const options = getCliCommandOptions(true);
+  if (!options) {
+    setStatus('软件包尚未就绪', 'err');
+    return;
+  }
+
+  const encrypt = getTokenMode() === 'encrypt';
+  const sharePassword = getSharePassword();
+  if (encrypt && !sharePassword) {
+    setStatus('加密模式需要填写分享密码', 'err');
+    sharePasswordEl?.focus();
+    return;
+  }
+
+  const repoLabel = options.owner && options.repo
+    ? `${options.owner}-${options.repo}`
+    : (options.projectPath || 'repo').replace(/\//g, '-');
+  const suffix = encrypt ? '-encrypted' : '';
+  const filename = `path-replace-cli-${repoLabel}${suffix}.zip`;
+
+  downloadPkgBtn.disabled = true;
+  setStatus('正在打包下载...', 'testing');
+
+  try {
+    const baseZipUrl = chrome.runtime.getURL('path-replace-cli-base.zip');
+    await downloadPathReplacePackage(baseZipUrl, options, {
+      includeToken: true,
+      encrypt,
+      sharePassword,
+      filename,
+    });
+    setStatus(
+      encrypt
+        ? `软件包已下载（加密 Token）：${filename}`
+        : `软件包已下载（明文 Token）：${filename}`,
+      'ok',
+    );
+  } catch (err) {
+    setStatus(err.message || '下载失败', 'err');
+  } finally {
+    downloadPkgBtn.disabled = false;
   }
 }
 
@@ -319,6 +388,10 @@ targetPathEl.addEventListener('input', () => {
 branchEl.addEventListener('input', renderCliCommand);
 commitMessageEl.addEventListener('input', renderCliCommand);
 copyCmdBtn.addEventListener('click', copyCliCommand);
+downloadPkgBtn.addEventListener('click', downloadCliPackage);
+tokenModePlainEl?.addEventListener('change', updateSharePasswordField);
+tokenModeEncryptEl?.addEventListener('change', updateSharePasswordField);
+updateSharePasswordField();
 
 replaceForm.addEventListener('submit', async (e) => {
   e.preventDefault();
