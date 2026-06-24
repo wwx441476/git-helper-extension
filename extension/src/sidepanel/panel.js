@@ -8,9 +8,11 @@ import {
 import { runCredentialVerify } from '../lib/credentials/verify-flow.js';
 import { getCredentialById } from '../lib/credentials/store.js';
 import { getRepositories } from '../lib/repositories/store.js';
+import { buildGitPushCommands } from '../lib/push/command.js';
 import {
   formatRepoPath,
   REPO_VERIFY_STATUS_LABELS,
+  resolveWorkingBranch,
 } from '../lib/repositories/types.js';
 import { runRepositoryVerify } from '../lib/repositories/verify-flow.js';
 import { runSandboxPull } from '../lib/sandbox/pull-flow.js';
@@ -147,6 +149,7 @@ function renderRepositoryCards(repositories) {
       <div class="card-meta card-cred">${cred ? `凭证：${escapeHtml(cred.name)}` : '未关联凭证'}</div>
       <div class="card-actions">
         <button type="button" class="btn secondary verify-repo-btn" data-id="${repo.id}">验证</button>
+        ${status === 'verified' ? `<button type="button" class="btn secondary copy-push-btn" data-id="${repo.id}">复制 push 命令</button>` : ''}
         ${status === 'verified' && supportsPathReplace(repo.platform) ? `<button type="button" class="btn secondary path-replace-btn" data-id="${repo.id}">目录替换</button>` : ''}
         ${status === 'verified' ? `<button type="button" class="btn primary pull-repo-btn" data-id="${repo.id}">沙箱拉取</button>` : ''}
       </div>
@@ -154,6 +157,7 @@ function renderRepositoryCards(repositories) {
     `;
 
     li.querySelector('.verify-repo-btn')?.addEventListener('click', () => verifyRepositoryById(repo.id, li));
+    li.querySelector('.copy-push-btn')?.addEventListener('click', () => copyPushCommand(repo.id, li));
     li.querySelector('.pull-repo-btn')?.addEventListener('click', () => {
       switchTab('sandbox');
       pullSandboxById(repo.id);
@@ -230,6 +234,54 @@ function openSandboxWorkspace(repositoryId) {
 function openPathReplace(repositoryId) {
   const url = chrome.runtime.getURL(`src/path-replace/index.html?repo=${encodeURIComponent(repositoryId)}`);
   chrome.tabs.create({ url });
+}
+
+async function copyPushCommand(repositoryId, cardEl) {
+  const msgEl = cardEl?.querySelector('.card-message');
+  const btn = cardEl?.querySelector('.copy-push-btn');
+  if (btn) {
+    btn.disabled = true;
+    btn.textContent = '复制中...';
+  }
+
+  try {
+    const repositories = await getRepositories();
+    const repo = repositories.find((item) => item.id === repositoryId);
+    if (!repo) throw new Error('仓库不存在');
+    if (repo.verify?.status !== 'verified') throw new Error('请先验证仓库');
+
+    const cred = await getCredentialById(repo.credentialId, true);
+    if (!cred?.token) throw new Error('关联凭证无可用 Token');
+
+    const branch = resolveWorkingBranch(repo);
+    const text = buildGitPushCommands({
+      platform: repo.platform,
+      host: repo.host,
+      fullPath: repo.fullPath,
+      remoteUrl: repo.remoteUrl,
+      repo: repo.repo,
+      token: cred.token,
+      username: cred.username || cred.verify?.username || '',
+      branch,
+      repoLabel: repo.name || formatRepoPath(repo),
+    });
+
+    await navigator.clipboard.writeText(text);
+    if (msgEl) {
+      msgEl.textContent = `push 命令已复制（含 Token · 分支 ${branch}）`;
+      msgEl.className = 'card-message status-verified';
+    }
+  } catch (err) {
+    if (msgEl) {
+      msgEl.textContent = err.message || '复制失败';
+      msgEl.className = 'card-message status-failed';
+    }
+  } finally {
+    if (btn) {
+      btn.disabled = false;
+      btn.textContent = '复制 push 命令';
+    }
+  }
 }
 
 async function pullSandboxById(id, cardEl) {

@@ -7,9 +7,12 @@ import {
   saveRepository,
   suggestCredentialId,
 } from '../lib/repositories/store.js';
+import { getCredentialById } from '../lib/credentials/store.js';
+import { buildGitPushCommands } from '../lib/push/command.js';
 import {
   formatRepoPath,
   REPO_VERIFY_STATUS_LABELS,
+  resolveWorkingBranch,
 } from '../lib/repositories/types.js';
 import { resolveRepositoryInput, runRepositoryVerify } from '../lib/repositories/verify-flow.js';
 import { runSandboxPull } from '../lib/sandbox/pull-flow.js';
@@ -309,6 +312,45 @@ export async function initRepositories(loadedCredentials) {
       }
     } catch (err) {
       setRepoStatus(err.message || '验证失败', 'err');
+    } finally {
+      btn.disabled = false;
+    }
+  });
+
+  document.getElementById('copyPushCmdBtn')?.addEventListener('click', async () => {
+    if (!editingRepoId) {
+      setRepoStatus('请先保存仓库', 'err');
+      return;
+    }
+
+    const btn = document.getElementById('copyPushCmdBtn');
+    btn.disabled = true;
+    setRepoStatus('正在生成 push 命令...', 'testing');
+
+    try {
+      const input = await resolveRepositoryInput(getRepoFormData(), credentials);
+      const repository = await saveRepository(input);
+      const cred = await getCredentialById(repository.credentialId, true);
+      if (!cred?.token) throw new Error('关联凭证无可用 Token');
+      if (repository.verify?.status !== 'verified') throw new Error('请先验证仓库');
+
+      const branch = resolveWorkingBranch(repository);
+      const text = buildGitPushCommands({
+        platform: repository.platform,
+        host: repository.host,
+        fullPath: repository.fullPath,
+        remoteUrl: repository.remoteUrl,
+        repo: repository.repo,
+        token: cred.token,
+        username: cred.username || cred.verify?.username || '',
+        branch,
+        repoLabel: repository.name || formatRepoPath(repository),
+      });
+
+      await navigator.clipboard.writeText(text);
+      setRepoStatus(`push 命令已复制（含 Token · 分支 ${branch}）`, 'ok');
+    } catch (err) {
+      setRepoStatus(err.message || '复制失败', 'err');
     } finally {
       btn.disabled = false;
     }
