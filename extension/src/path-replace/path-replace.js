@@ -1,10 +1,15 @@
 import { getRepositoryById } from '../lib/repositories/store.js';
+import { getCredentialById, resolveApiBase } from '../lib/credentials/store.js';
+import { maskToken } from '../lib/credentials/types.js';
+import { getParseOptionsFromCredential, parseRemoteUrl, applyParsedUrl } from '../lib/repositories/parse-url.js';
+import { createRepository } from '../lib/repositories/types.js';
+import { buildPathReplaceCliCommand } from '../lib/gitlab/cli-command.js';
 import {
   mapLocalUploadToRemoteFiles,
   parseExcludePaths,
-  replaceGitlabDirectory,
-  scanGitlabTargetPath,
-} from '../lib/gitlab/path-replace.js';
+  replaceDirectory,
+  scanTargetPath,
+} from '../lib/path-replace/index.js';
 
 const params = new URLSearchParams(window.location.search);
 const repositoryId = params.get('repo') || '';
@@ -27,6 +32,11 @@ const statusBarEl = document.getElementById('statusBar');
 const replaceForm = document.getElementById('replaceForm');
 const submitBtn = document.getElementById('submitBtn');
 const scanBtn = document.getElementById('scanBtn');
+const cliCommandEl = document.getElementById('cliCommand');
+const copyCmdBtn = document.getElementById('copyCmdBtn');
+
+/** @type {{ apiBase: string, projectPath: string, defaultBranch: string, token: string, platform: string, owner: string, repo: string } | null} */
+let repoContext = null;
 
 /** @type {{ deleteCount: number, excludedCount: number, deleteFiles: string[], excludedFiles: string[] }} */
 let scanSummary = { deleteCount: 0, excludedCount: 0, deleteFiles: [], excludedFiles: [] };
@@ -98,6 +108,75 @@ function getExcludeInput() {
   return excludePathsEl.value.trim();
 }
 
+function getTokenEnvName(platform) {
+  if (platform === 'github') return 'GITHUB_TOKEN';
+  if (platform === 'gitee') return 'GITEE_TOKEN';
+  return 'GITLAB_TOKEN';
+}
+
+function getCliScriptPath(platform) {
+  if (platform === 'github') return 'scripts/github-path-replace.mjs';
+  if (platform === 'gitee') return 'scripts/gitee-path-replace.mjs';
+  return 'scripts/gitlab-path-replace.mjs';
+}
+
+function getEffectiveBranch() {
+  return branchEl.value.trim() || repoContext?.defaultBranch || '';
+}
+
+function getCliCommandOptions(includeFullToken = false) {
+  if (!repoContext) return null;
+
+  const token = repoContext.token || '';
+  const tokenEnv = getTokenEnvName(repoContext.platform);
+  return {
+    platform: repoContext.platform,
+    apiBase: repoContext.apiBase,
+    projectPath: repoContext.projectPath,
+    owner: repoContext.owner,
+    repo: repoContext.repo,
+    branch: getEffectiveBranch(),
+    targetPath: targetPathEl.value.trim(),
+    excludeInput: getExcludeInput(),
+    commitMessage: commitMessageEl.value.trim(),
+    scriptPath: getCliScriptPath(repoContext.platform),
+    tokenEnv,
+    token: includeFullToken ? token : (token ? maskToken(token) : ''),
+  };
+}
+
+function renderCliCommand() {
+  const options = getCliCommandOptions(false);
+  if (!options) {
+    cliCommandEl.textContent = '无法生成命令：仓库未就绪';
+    return;
+  }
+
+  cliCommandEl.textContent = buildPathReplaceCliCommand(options);
+}
+
+async function copyCliCommand() {
+  if (!repoContext?.token) {
+    setStatus('无法复制：关联凭证无可用 Token', 'err');
+    return;
+  }
+
+  const options = getCliCommandOptions(true);
+  if (!options) {
+    setStatus('命令尚未就绪', 'err');
+    return;
+  }
+
+  const text = buildPathReplaceCliCommand(options);
+
+  try {
+    await navigator.clipboard.writeText(text);
+    setStatus(`命令已复制（含 ${getTokenEnvName(repoContext.platform)}）`, 'ok');
+  } catch {
+    setStatus('复制失败，请手动选中命令复制', 'err');
+  }
+}
+
 function getUploadSource() {
   return {
     zipFile: uploadSource.zipFile,
@@ -138,6 +217,34 @@ async function initPage() {
   if (!branchEl.value) {
     branchEl.value = repository.defaultBranch || '';
   }
+
+  if (!repository.credentialId) {
+    cliCommandEl.textContent = '无法生成命令：仓库未关联凭证';
+    return;
+  }
+
+  const credential = await getCredentialById(repository.credentialId, true);
+  if (!credential) {
+    cliCommandEl.textContent = '无法生成命令：关联凭证不存在';
+    return;
+  }
+
+  const parsed = parseRemoteUrl(
+    repository.remoteUrl,
+    getParseOptionsFromCredential(credential),
+  );
+  const merged = applyParsedUrl(createRepository(repository), parsed);
+
+  repoContext = {
+    apiBase: resolveApiBase(credential),
+    projectPath: merged.fullPath,
+    owner: merged.owner,
+    repo: merged.repo,
+    platform: repository.platform,
+    defaultBranch: repository.defaultBranch || '',
+    token: credential.token || '',
+  };
+  renderCliCommand();
 }
 
 async function scanRemote() {
@@ -145,7 +252,7 @@ async function scanRemote() {
   setStatus('正在扫描远程目录...', 'testing');
 
   try {
-    const result = await scanGitlabTargetPath(
+    const result = await scanTargetPath(
       repositoryId,
       targetPathEl.value,
       branchEl.value.trim(),
@@ -200,12 +307,18 @@ localFolderEl.addEventListener('change', async () => {
 excludePathsEl.addEventListener('input', () => {
   clearScanDetails('路径已变更，请重新扫描');
   if (uploadSource.uploadCount) previewUploadSource();
+  renderCliCommand();
 });
 
 targetPathEl.addEventListener('input', () => {
   clearScanDetails('目标路径已变更，请重新扫描');
   if (uploadSource.uploadCount) previewUploadSource();
+  renderCliCommand();
 });
+
+branchEl.addEventListener('input', renderCliCommand);
+commitMessageEl.addEventListener('input', renderCliCommand);
+copyCmdBtn.addEventListener('click', copyCliCommand);
 
 replaceForm.addEventListener('submit', async (e) => {
   e.preventDefault();
@@ -233,7 +346,7 @@ replaceForm.addEventListener('submit', async (e) => {
   setStatus('正在提交变更（可能需要几十秒）...', 'testing');
 
   try {
-    const result = await replaceGitlabDirectory(
+    const result = await replaceDirectory(
       repositoryId,
       targetPathEl.value,
       getUploadSource(),

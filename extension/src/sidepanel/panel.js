@@ -21,6 +21,12 @@ import {
   SANDBOX_PULL_STATUS_LABELS,
 } from '../lib/sandbox/types.js';
 
+const PATH_REPLACE_PLATFORMS = new Set(['gitlab', 'github', 'gitee']);
+
+function supportsPathReplace(platform) {
+  return PATH_REPLACE_PLATFORMS.has(platform);
+}
+
 const summaryEl = document.getElementById('summary');
 const credCardsEl = document.getElementById('credCards');
 const emptyStateEl = document.getElementById('emptyState');
@@ -141,7 +147,7 @@ function renderRepositoryCards(repositories) {
       <div class="card-meta card-cred">${cred ? `凭证：${escapeHtml(cred.name)}` : '未关联凭证'}</div>
       <div class="card-actions">
         <button type="button" class="btn secondary verify-repo-btn" data-id="${repo.id}">验证</button>
-        ${status === 'verified' && repo.platform === 'gitlab' ? `<button type="button" class="btn secondary path-replace-btn" data-id="${repo.id}">目录替换</button>` : ''}
+        ${status === 'verified' && supportsPathReplace(repo.platform) ? `<button type="button" class="btn secondary path-replace-btn" data-id="${repo.id}">目录替换</button>` : ''}
         ${status === 'verified' ? `<button type="button" class="btn primary pull-repo-btn" data-id="${repo.id}">沙箱拉取</button>` : ''}
       </div>
       <div class="card-message status-${status}">${escapeHtml(repo.verify?.message || '')}</div>
@@ -204,7 +210,7 @@ function renderSandboxCards(repositories, sessions) {
       <div class="card-actions">
         <button type="button" class="btn primary sandbox-pull-btn" data-id="${repo.id}">拉取代码</button>
         ${pull?.status === 'success' && pull?.hasWorkspace ? `<button type="button" class="btn secondary sandbox-open-btn" data-id="${repo.id}">打开沙箱</button>` : ''}
-        ${repo.platform === 'gitlab' ? `<button type="button" class="btn secondary path-replace-btn" data-id="${repo.id}">目录替换</button>` : ''}
+        ${supportsPathReplace(repo.platform) ? `<button type="button" class="btn secondary path-replace-btn" data-id="${repo.id}">目录替换</button>` : ''}
       </div>
       <div class="card-message status-${status === 'success' ? 'verified' : status} sandbox-detail">${escapeHtml(detail)}</div>
     `;

@@ -21,12 +21,38 @@ function isLikelyText(path, bytes) {
 
 function arrayBufferToBase64(buffer) {
   const bytes = new Uint8Array(buffer);
+  if (typeof Buffer !== 'undefined') {
+    return Buffer.from(bytes).toString('base64');
+  }
   let binary = '';
   const chunk = 0x8000;
   for (let i = 0; i < bytes.length; i += chunk) {
     binary += String.fromCharCode(...bytes.subarray(i, i + chunk));
   }
   return btoa(binary);
+}
+
+/**
+ * @param {ArrayBuffer|Uint8Array} buffer
+ */
+export function readZipUploadFilesFromBuffer(buffer) {
+  const byteLength = buffer.byteLength ?? buffer.length;
+  if (byteLength > MAX_ARCHIVE_BYTES) {
+    throw new Error(`ZIP 超过 ${Math.round(MAX_ARCHIVE_BYTES / 1024 / 1024)}MB 上限`);
+  }
+
+  const normalized = normalizeZipEntries(unzipSync(
+    buffer instanceof Uint8Array ? buffer : new Uint8Array(buffer),
+  ));
+  const files = Object.entries(normalized)
+    .filter(([path]) => path && !path.endsWith('/'))
+    .map(([path, bytes]) => toUploadEntry(path.replace(/\\/g, '/'), bytes));
+
+  if (files.length === 0) {
+    throw new Error('ZIP 内没有可用文件');
+  }
+
+  return files;
 }
 
 function toUploadEntry(relativePath, bytes) {
@@ -104,20 +130,7 @@ export async function readZipUploadFiles(zipFile) {
   }
 
   const buffer = await zipFile.arrayBuffer();
-  if (buffer.byteLength > MAX_ARCHIVE_BYTES) {
-    throw new Error(`ZIP 超过 ${Math.round(MAX_ARCHIVE_BYTES / 1024 / 1024)}MB 上限`);
-  }
-
-  const normalized = normalizeZipEntries(unzipSync(new Uint8Array(buffer)));
-  const files = Object.entries(normalized)
-    .filter(([path]) => path && !path.endsWith('/'))
-    .map(([path, bytes]) => toUploadEntry(path.replace(/\\/g, '/'), bytes));
-
-  if (files.length === 0) {
-    throw new Error('ZIP 内没有可用文件');
-  }
-
-  return files;
+  return readZipUploadFilesFromBuffer(buffer);
 }
 
 /**

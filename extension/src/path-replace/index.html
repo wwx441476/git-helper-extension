@@ -17,8 +17,8 @@
 
   <main class="main">
     <p class="desc">
-      无需拉取全库：扫描远程目录 → 删除其下文件（可排除指定子路径）→ 上传本地文件夹。
-      当前仅支持 <strong>GitLab</strong>。
+      无需拉取全库：扫描远程目录 → 删除其下文件（可排除指定子路径）→ 上传本地 ZIP 或文件夹。
+      支持 <strong>GitLab</strong>、<strong>GitHub</strong>、<strong>Gitee</strong>。
     </p>
 
     <form id="replaceForm" class="form">
@@ -77,6 +77,15 @@
       </label>
 
       <div id="localPreview" class="preview">未选择文件夹</div>
+
+      <section class="cli-section">
+        <div class="cli-head">
+          <span class="cli-title">终端命令</span>
+          <button type="button" id="copyCmdBtn" class="btn secondary small">复制命令</button>
+        </div>
+        <p class="cli-desc">预览中 Token 已脱敏；点击复制会写入完整 Token 环境变量，终端执行时只需修改 <code>--zip</code> 路径。</p>
+        <pre id="cliCommand" class="cli-command">加载中...</pre>
+      </section>
 
       <div class="actions">
         <button type="submit" id="submitBtn" class="btn primary">删除远程目录并上传</button>
