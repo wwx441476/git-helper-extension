@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Git Helper · 目录替换</title>
+  <link rel="stylesheet" href="path-replace.css" />
+</head>
+<body>
+  <header class="header">
+    <div class="header-left">
+      <span class="logo">目录替换</span>
+      <span id="repoMeta" class="subtitle">—</span>
+    </div>
+    <button type="button" id="closeBtn" class="btn ghost">关闭</button>
+  </header>
+
+  <main class="main">
+    <p class="desc">
+      无需拉取全库：扫描远程目录 → 删除其下文件（可排除指定子路径）→ 上传本地文件夹。
+      当前仅支持 <strong>GitLab</strong>。
+    </p>
+
+    <form id="replaceForm" class="form">
+      <label class="field">
+        <span>目标路径</span>
+        <input type="text" id="targetPath" value="src/main/resources/static/atelier" required />
+        <small>远程仓库内的目录，不含首尾斜杠</small>
+      </label>
+
+      <label class="field">
+        <span>分支</span>
+        <input type="text" id="branch" placeholder="使用仓库工作分支" />
+      </label>
+
+      <label class="field">
+        <span>排除路径</span>
+        <textarea id="excludePaths" rows="3" placeholder="docOnline">docOnline</textarea>
+        <small>相对于目标路径的子目录，每行一个。这些路径下的远程文件不会被删除，也不会被上传覆盖。</small>
+      </label>
+
+      <label class="field">
+        <span>提交说明</span>
+        <input type="text" id="commitMessage" value="replace atelier static files" />
+      </label>
+
+      <div class="scan-row">
+        <button type="button" id="scanBtn" class="btn secondary">扫描远程目录</button>
+        <span id="scanResult" class="scan-result">尚未扫描</span>
+      </div>
+
+      <div id="scanDetails" class="scan-details hidden">
+        <div class="scan-panel">
+          <div class="scan-panel-head delete-head">
+            <span id="deleteListTitle">将删除（0）</span>
+          </div>
+          <ul id="deleteList" class="scan-file-list"></ul>
+        </div>
+        <div class="scan-panel">
+          <div class="scan-panel-head keep-head">
+            <span id="keepListTitle">将保留（0）</span>
+          </div>
+          <ul id="keepList" class="scan-file-list"></ul>
+        </div>
+      </div>
+
+      <label class="field">
+        <span>本地 ZIP 包</span>
+        <input type="file" id="localZip" accept=".zip,application/zip" />
+        <small>直接选择构建产物 zip（自动解压并识别 dist 目录），例如 document-online-develop-*.zip</small>
+      </label>
+
+      <label class="field">
+        <span>或选择本地文件夹</span>
+        <input type="file" id="localFolder" webkitdirectory directory multiple />
+        <small>解压后选择 dist 文件夹（将保留内部子目录结构）</small>
+      </label>
+
+      <div id="localPreview" class="preview">未选择文件夹</div>
+
+      <div class="actions">
+        <button type="submit" id="submitBtn" class="btn primary">删除远程目录并上传</button>
+      </div>
+    </form>
+  </main>
+
+  <footer id="statusBar" class="status-bar"></footer>
+
+  <script type="module" src="path-replace.js"></script>
+</body>
+</html>

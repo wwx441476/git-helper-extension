@@ -1,0 +1,34 @@
+{
+  "manifest_version": 3,
+  "name": "Git Helper - 凭证管理",
+  "version": "0.1.0",
+  "description": "管理 GitHub、Gitee、GitLab 访问凭证，验证连通性，为后续 push 做准备",
+  "permissions": ["storage", "sidePanel", "tabs"],
+  "host_permissions": [
+    "https://api.github.com/*",
+    "https://gitee.com/*",
+    "https://gitlab.com/*",
+    "https://*/*"
+  ],
+  "background": {
+    "service_worker": "src/background/service-worker.js",
+    "type": "module"
+  },
+  "side_panel": {
+    "default_path": "src/sidepanel/index.html"
+  },
+  "options_page": "src/options/index.html",
+  "action": {
+    "default_title": "打开 Git Helper 侧边栏",
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "48": "icons/icon48.png",
+      "128": "icons/icon128.png"
+    }
+  },
+  "icons": {
+    "16": "icons/icon16.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  }
+}

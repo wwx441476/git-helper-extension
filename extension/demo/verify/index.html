@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Git Helper Mock 验证环境</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'PingFang SC', sans-serif;
+      background: #0f1117;
+      color: #e5e7eb;
+      padding: 32px 20px;
+      line-height: 1.6;
+    }
+    .wrap { max-width: 720px; margin: 0 auto; }
+    h1 { color: #34d399; margin-bottom: 8px; }
+    .desc { color: #9ca3af; margin-bottom: 24px; }
+    .card {
+      background: #111827;
+      border: 1px solid #1f2937;
+      border-radius: 12px;
+      padding: 18px;
+      margin-bottom: 16px;
+    }
+    h2 { font-size: 16px; margin-bottom: 10px; }
+    table { width: 100%; border-collapse: collapse; font-size: 14px; }
+    th, td { text-align: left; padding: 10px 8px; border-bottom: 1px solid #1f2937; }
+    code {
+      background: #1f2937;
+      padding: 2px 6px;
+      border-radius: 4px;
+      color: #fcd34d;
+    }
+    ol { padding-left: 20px; color: #d1d5db; }
+    li { margin-bottom: 8px; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <h1>Mock 验证环境</h1>
+    <p class="desc">用于在不访问真实 Git 平台 API 的情况下联调凭证验证 UI。</p>
+
+    <div class="card">
+      <h2>Mock Token 对照表</h2>
+      <table>
+        <thead>
+          <tr><th>Token</th><th>模拟结果</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><code>mock:success</code></td><td>验证成功，用户 mock-user</td></tr>
+          <tr><td><code>mock:401</code></td><td>HTTP 401: Bad credentials</td></tr>
+          <tr><td><code>mock:403</code></td><td>HTTP 403: insufficient_scope</td></tr>
+          <tr><td><code>mock:timeout</code></td><td>请求超时（约 12 秒）</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="card">
+      <h2>使用步骤</h2>
+      <ol>
+        <li>打开扩展选项页，开启「使用 Mock 验证端点」</li>
+        <li>添加凭证，Token 填入上表中的 Mock Token</li>
+        <li>点击「验证凭证」，观察成功/失败 UI</li>
+        <li>侧边栏同步显示验证状态</li>
+      </ol>
+    </div>
+
+    <div class="card">
+      <h2>说明</h2>
+      <p>Mock 逻辑实现在扩展内 <code>src/lib/verify/mock.js</code>，本页面仅作开发文档与对照参考，不直接提供 HTTP 服务。</p>
+    </div>
+  </div>
+</body>
+</html>

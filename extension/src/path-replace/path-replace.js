@@ -1,0 +1,259 @@
+import { getRepositoryById } from '../lib/repositories/store.js';
+import {
+  mapLocalUploadToRemoteFiles,
+  parseExcludePaths,
+  replaceGitlabDirectory,
+  scanGitlabTargetPath,
+} from '../lib/gitlab/path-replace.js';
+
+const params = new URLSearchParams(window.location.search);
+const repositoryId = params.get('repo') || '';
+
+const repoMetaEl = document.getElementById('repoMeta');
+const targetPathEl = document.getElementById('targetPath');
+const branchEl = document.getElementById('branch');
+const excludePathsEl = document.getElementById('excludePaths');
+const commitMessageEl = document.getElementById('commitMessage');
+const scanResultEl = document.getElementById('scanResult');
+const scanDetailsEl = document.getElementById('scanDetails');
+const deleteListEl = document.getElementById('deleteList');
+const keepListEl = document.getElementById('keepList');
+const deleteListTitleEl = document.getElementById('deleteListTitle');
+const keepListTitleEl = document.getElementById('keepListTitle');
+const localZipEl = document.getElementById('localZip');
+const localFolderEl = document.getElementById('localFolder');
+const localPreviewEl = document.getElementById('localPreview');
+const statusBarEl = document.getElementById('statusBar');
+const replaceForm = document.getElementById('replaceForm');
+const submitBtn = document.getElementById('submitBtn');
+const scanBtn = document.getElementById('scanBtn');
+
+/** @type {{ deleteCount: number, excludedCount: number, deleteFiles: string[], excludedFiles: string[] }} */
+let scanSummary = { deleteCount: 0, excludedCount: 0, deleteFiles: [], excludedFiles: [] };
+
+/** @type {{ zipFile: File|null, folderFiles: File[], uploadCount: number, sourceLabel: string }} */
+let uploadSource = { zipFile: null, folderFiles: [], uploadCount: 0, sourceLabel: '' };
+
+function setStatus(text, type = '') {
+  statusBarEl.textContent = text;
+  statusBarEl.className = `status-bar ${type}`;
+}
+
+function stripBasePath(basePath, filePath) {
+  const base = basePath.replace(/\/+$/, '');
+  if (filePath === base) return filePath.split('/').pop() || filePath;
+  if (filePath.startsWith(`${base}/`)) return filePath.slice(base.length + 1);
+  return filePath;
+}
+
+function renderFileList(listEl, files, basePath) {
+  listEl.innerHTML = '';
+  if (files.length === 0) {
+    const empty = document.createElement('li');
+    empty.textContent = '（无）';
+    empty.style.color = '#6b7280';
+    listEl.appendChild(empty);
+    return;
+  }
+
+  for (const file of files) {
+    const li = document.createElement('li');
+    li.textContent = stripBasePath(basePath, file);
+    li.title = file;
+    listEl.appendChild(li);
+  }
+}
+
+function renderScanDetails(result) {
+  const deleteFiles = [...result.files].sort((a, b) => a.localeCompare(b));
+  const excludedFiles = [...result.excludedFiles].sort((a, b) => a.localeCompare(b));
+
+  scanSummary = {
+    deleteCount: deleteFiles.length,
+    excludedCount: excludedFiles.length,
+    deleteFiles,
+    excludedFiles,
+  };
+
+  deleteListTitleEl.textContent = `将删除（${deleteFiles.length}）`;
+  keepListTitleEl.textContent = `将保留（${excludedFiles.length}）`;
+  renderFileList(deleteListEl, deleteFiles, result.dirPath);
+  renderFileList(keepListEl, excludedFiles, result.dirPath);
+  scanDetailsEl.classList.remove('hidden');
+
+  scanResultEl.textContent = excludedFiles.length > 0
+    ? `将删除 ${deleteFiles.length} 个文件，保留 ${excludedFiles.length} 个（已排除）`
+    : `将删除 ${deleteFiles.length} 个远程文件`;
+}
+
+function clearScanDetails(message = '尚未扫描') {
+  scanSummary = { deleteCount: 0, excludedCount: 0, deleteFiles: [], excludedFiles: [] };
+  scanResultEl.textContent = message;
+  scanDetailsEl.classList.add('hidden');
+  deleteListEl.innerHTML = '';
+  keepListEl.innerHTML = '';
+}
+
+function getExcludeInput() {
+  return excludePathsEl.value.trim();
+}
+
+function getUploadSource() {
+  return {
+    zipFile: uploadSource.zipFile,
+    folderFiles: uploadSource.folderFiles,
+  };
+}
+
+async function previewUploadSource() {
+  if (!uploadSource.uploadCount) {
+    localPreviewEl.textContent = '未选择 ZIP 或文件夹';
+    return;
+  }
+
+  try {
+    const excludePrefixes = parseExcludePaths(getExcludeInput(), targetPathEl.value);
+    const mapped = await mapLocalUploadToRemoteFiles(getUploadSource(), targetPathEl.value, excludePrefixes);
+    const preview = mapped.slice(0, 30).map((item) => item.path).join('\n');
+    const suffix = mapped.length > 30 ? `\n... 共 ${mapped.length} 个文件` : `\n共 ${mapped.length} 个文件`;
+    localPreviewEl.textContent = `${uploadSource.sourceLabel}\n${preview}${suffix}`;
+  } catch (err) {
+    localPreviewEl.textContent = err.message || '读取上传内容失败';
+  }
+}
+
+async function initPage() {
+  if (!repositoryId) {
+    setStatus('缺少仓库参数 ?repo=', 'err');
+    return;
+  }
+
+  const repository = await getRepositoryById(repositoryId);
+  if (!repository) {
+    setStatus('仓库不存在', 'err');
+    return;
+  }
+
+  repoMetaEl.textContent = `${repository.name} · ${repository.defaultBranch || 'main'}`;
+  if (!branchEl.value) {
+    branchEl.value = repository.defaultBranch || '';
+  }
+}
+
+async function scanRemote() {
+  scanBtn.disabled = true;
+  setStatus('正在扫描远程目录...', 'testing');
+
+  try {
+    const result = await scanGitlabTargetPath(
+      repositoryId,
+      targetPathEl.value,
+      branchEl.value.trim(),
+      getExcludeInput(),
+    );
+    renderScanDetails(result);
+    setStatus(`扫描完成：${result.dirPath}`, 'ok');
+  } catch (err) {
+    clearScanDetails('扫描失败');
+    setStatus(err.message || '扫描失败', 'err');
+  } finally {
+    scanBtn.disabled = false;
+  }
+}
+
+localZipEl.addEventListener('change', async () => {
+  const file = localZipEl.files?.[0] || null;
+  if (!file) {
+    uploadSource = { zipFile: null, folderFiles: [], uploadCount: 0, sourceLabel: '' };
+    localPreviewEl.textContent = '未选择 ZIP 或文件夹';
+    return;
+  }
+
+  localFolderEl.value = '';
+  uploadSource = {
+    zipFile: file,
+    folderFiles: [],
+    uploadCount: 1,
+    sourceLabel: `ZIP：${file.name}`,
+  };
+  await previewUploadSource();
+});
+
+localFolderEl.addEventListener('change', async () => {
+  const files = Array.from(localFolderEl.files || []);
+  if (files.length === 0) {
+    uploadSource = { zipFile: null, folderFiles: [], uploadCount: 0, sourceLabel: '' };
+    localPreviewEl.textContent = '未选择 ZIP 或文件夹';
+    return;
+  }
+
+  localZipEl.value = '';
+  uploadSource = {
+    zipFile: null,
+    folderFiles: files,
+    uploadCount: files.length,
+    sourceLabel: `文件夹：${files[0].webkitRelativePath.split('/')[0] || '已选'}`,
+  };
+  await previewUploadSource();
+});
+
+excludePathsEl.addEventListener('input', () => {
+  clearScanDetails('路径已变更，请重新扫描');
+  if (uploadSource.uploadCount) previewUploadSource();
+});
+
+targetPathEl.addEventListener('input', () => {
+  clearScanDetails('目标路径已变更，请重新扫描');
+  if (uploadSource.uploadCount) previewUploadSource();
+});
+
+replaceForm.addEventListener('submit', async (e) => {
+  e.preventDefault();
+
+  if (!uploadSource.uploadCount) {
+    setStatus('请先选择 ZIP 包或本地文件夹', 'err');
+    return;
+  }
+
+  const excludeText = getExcludeInput();
+  const confirmText = [
+    `目标路径：${targetPathEl.value.trim()}`,
+    `分支：${branchEl.value.trim() || '（仓库默认）'}`,
+    excludeText ? `排除路径：\n${excludeText}` : '排除路径：无',
+    `上传来源：${uploadSource.sourceLabel}`,
+    `将删除远程 ${scanSummary.deleteCount || '（未扫描，提交时计算）'} 个文件`,
+    scanSummary.excludedCount ? `将保留 ${scanSummary.excludedCount} 个文件（排除）` : '',
+    '',
+    '确定继续？',
+  ].filter(Boolean).join('\n');
+
+  if (!confirm(confirmText)) return;
+
+  submitBtn.disabled = true;
+  setStatus('正在提交变更（可能需要几十秒）...', 'testing');
+
+  try {
+    const result = await replaceGitlabDirectory(
+      repositoryId,
+      targetPathEl.value,
+      getUploadSource(),
+      commitMessageEl.value,
+      branchEl.value.trim(),
+      excludeText,
+    );
+
+    setStatus(
+      `完成 · 删除 ${result.deletedCount} · 保留 ${result.excludedCount} · 上传 ${result.createdCount} · 提交 ${result.commitSha}`,
+      'ok',
+    );
+  } catch (err) {
+    setStatus(err.message || '提交失败', 'err');
+  } finally {
+    submitBtn.disabled = false;
+  }
+});
+
+document.getElementById('scanBtn').addEventListener('click', scanRemote);
+document.getElementById('closeBtn').addEventListener('click', () => window.close());
+
+initPage().catch((err) => setStatus(err.message || '初始化失败', 'err'));

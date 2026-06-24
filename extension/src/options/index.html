@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Git Helper 设置</title>
+  <link rel="stylesheet" href="options.css" />
+</head>
+<body>
+  <div class="app">
+    <header class="topbar">
+      <div class="topbar-left">
+        <h1>Git Helper 设置</h1>
+        <p class="desc">管理凭证与远程仓库，为 push 做准备</p>
+      </div>
+      <button id="addBtn" class="add-btn hidden" title="添加">+</button>
+    </header>
+
+    <nav class="tabs">
+      <button type="button" class="tab active" data-tab="credentials">凭证</button>
+      <button type="button" class="tab" data-tab="repositories">仓库</button>
+    </nav>
+
+    <section id="credentialsPanel">
+      <section class="dev-panel">
+      <label class="toggle-row">
+        <input type="checkbox" id="useMockVerify" />
+        <span>使用 Mock 验证端点（开发联调，不请求真实平台 API）</span>
+      </label>
+      <label class="toggle-row">
+        <input type="checkbox" id="useMockSandboxPull" />
+        <span>使用 Mock 沙箱拉取（开发联调，不下载真实归档）</span>
+      </label>
+      <p class="dev-hint">Mock Token 示例：<code>mock:success</code>、<code>mock:401</code>、<code>mock:403</code>、<code>mock:timeout</code></p>
+      </section>
+
+      <div class="layout">
+        <aside class="cred-list-wrap">
+          <div class="list-header">
+            <span>凭证列表</span>
+            <span id="credCount" class="count"></span>
+          </div>
+          <ul id="credList" class="cred-list"></ul>
+        </aside>
+
+        <main class="editor">
+          <form id="form">
+            <label>
+              <span>名称 <em>*</em></span>
+              <input type="text" id="name" placeholder="例如：公司 GitHub" />
+            </label>
+
+            <label>
+              <span>平台 <em>*</em></span>
+              <select id="platform">
+                <option value="github">GitHub</option>
+                <option value="gitee">Gitee</option>
+                <option value="gitlab">GitLab</option>
+              </select>
+            </label>
+
+            <label>
+              <span>平台用户名</span>
+              <input type="text" id="username" placeholder="验证成功后自动填入，也可手动填写" />
+              <small>用于 HTTPS push；验证后会从平台 API 自动获取</small>
+            </label>
+
+            <label>
+              <span>Token <em>*</em></span>
+              <input type="password" id="token" placeholder="Personal Access Token" autocomplete="off" />
+              <small>列表展示时会脱敏；编辑时需重新输入或保留原 Token</small>
+            </label>
+
+            <label>
+              <span>API Base URL</span>
+              <input type="url" id="apiBase" placeholder="留空则使用平台默认值" />
+              <small id="apiBaseHint">GitHub 默认：https://api.github.com</small>
+            </label>
+
+            <label class="checkbox-row">
+              <input type="checkbox" id="isDefault" />
+              <span>设为该平台的默认凭证</span>
+            </label>
+
+            <div id="verifyCard" class="verify-card hidden">
+              <div class="verify-title">验证状态</div>
+              <div id="verifyStatus" class="verify-status"></div>
+              <div id="verifyMeta" class="verify-meta"></div>
+            </div>
+
+            <div class="actions">
+              <button type="button" id="verifyBtn" class="btn secondary">验证凭证</button>
+              <button type="submit" class="btn primary">保存</button>
+              <button type="button" id="deleteBtn" class="btn danger">删除</button>
+            </div>
+
+            <p id="status" class="status"></p>
+          </form>
+        </main>
+      </div>
+    </section>
+
+    <section id="repositoriesPanel" class="hidden">
+      <div class="layout">
+        <aside class="cred-list-wrap">
+          <div class="list-header">
+            <span>仓库列表</span>
+            <span id="repoCount" class="count"></span>
+          </div>
+          <ul id="repoList" class="cred-list"></ul>
+        </aside>
+
+        <main class="editor">
+          <form id="repoForm">
+            <label>
+              <span>名称 <em>*</em></span>
+              <input type="text" id="repoName" placeholder="例如：前端项目" />
+            </label>
+
+            <label>
+              <span>仓库地址 <em>*</em></span>
+              <input type="text" id="repoRemoteUrl" placeholder="https://github.com/owner/repo.git 或 git@host:group/project.git" autocapitalize="off" autocorrect="off" spellcheck="false" />
+              <small>支持 HTTPS 或 SSH（git@github.com:owner/repo.git）</small>
+              <div id="repoParsePreview" class="parse-preview"></div>
+            </label>
+
+            <label>
+              <span>关联凭证 <em>*</em></span>
+              <select id="repoCredentialId"></select>
+              <small>需先添加并验证同平台凭证；自建 GitLab 凭证请填写 API Base（如 https://git.yyrd.com/api/v4）</small>
+            </label>
+
+            <label>
+              <span>工作分支</span>
+              <div class="branch-row">
+                <select id="repoBranchSelect">
+                  <option value="">从列表选择分支</option>
+                </select>
+                <input type="text" id="repoDefaultBranch" placeholder="或手动输入，如 develop-v5" />
+                <button type="button" id="loadBranchesBtn" class="btn secondary">加载分支</button>
+              </div>
+              <small>手动输入的分支优先，验证不会覆盖；远程默认分支显示在验证结果中</small>
+            </label>
+
+            <div id="repoVerifyCard" class="verify-card hidden">
+              <div class="verify-title">仓库验证状态</div>
+              <div id="repoVerifyStatus" class="verify-status"></div>
+              <div id="repoVerifyMeta" class="verify-meta"></div>
+            </div>
+
+            <div class="actions">
+              <button type="button" id="verifyRepoBtn" class="btn secondary">验证仓库</button>
+              <button type="button" id="pullRepoBtn" class="btn secondary">沙箱拉取</button>
+              <button type="submit" class="btn primary">保存</button>
+              <button type="button" id="deleteRepoBtn" class="btn danger">删除</button>
+            </div>
+
+            <p id="repoStatus" class="status"></p>
+          </form>
+        </main>
+      </div>
+    </section>
+  </div>
+
+  <button id="addRepoBtn" class="add-btn floating-add hidden" title="添加仓库">+</button>
+
+  <script type="module" src="./options.js"></script>
+</body>
+</html>

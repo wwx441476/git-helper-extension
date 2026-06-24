@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Git Helper 沙箱</title>
+  <link rel="stylesheet" href="sandbox.css" />
+</head>
+<body>
+  <header class="header">
+    <div class="header-left">
+      <span class="logo">Git Helper 沙箱</span>
+      <span id="repoMeta" class="subtitle">—</span>
+    </div>
+    <div class="header-actions">
+      <button type="button" id="refreshBtn" class="btn secondary">刷新列表</button>
+      <button type="button" id="closeBtn" class="btn ghost">关闭</button>
+    </div>
+  </header>
+
+  <div id="emptyState" class="empty-state hidden">
+    <h2>沙箱为空</h2>
+    <p>请先在侧边栏对仓库执行「拉取代码」</p>
+  </div>
+
+  <main id="workspace" class="workspace hidden">
+    <aside class="file-panel">
+      <div class="panel-toolbar">
+        <button type="button" id="addFileBtn" class="btn primary">新建文件</button>
+        <button type="button" id="deleteFileBtn" class="btn danger" disabled>删除</button>
+      </div>
+      <div class="file-search">
+        <input type="search" id="fileSearch" placeholder="搜索文件..." />
+      </div>
+      <ul id="fileList" class="file-list"></ul>
+      <div id="fileStats" class="file-stats"></div>
+    </aside>
+
+    <section class="editor-panel">
+      <div class="editor-toolbar">
+        <span id="currentFile" class="current-file">未选择文件</span>
+        <span id="fileStatus" class="file-status"></span>
+        <button type="button" id="saveFileBtn" class="btn primary" disabled>保存修改</button>
+      </div>
+      <div id="binaryNotice" class="binary-notice hidden">该文件为二进制，沙箱内暂不支持编辑</div>
+      <textarea id="editor" class="editor" spellcheck="false" disabled placeholder="从左侧选择文件进行编辑"></textarea>
+    </section>
+  </main>
+
+  <footer id="statusBar" class="status-bar"></footer>
+
+  <script type="module" src="sandbox.js"></script>
+</body>
+</html>

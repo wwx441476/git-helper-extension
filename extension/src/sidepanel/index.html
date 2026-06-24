@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Git Helper</title>
+  <link rel="stylesheet" href="panel.css" />
+</head>
+<body>
+  <header class="header">
+    <div class="header-left">
+      <span class="logo">Git Helper</span>
+      <span class="subtitle">凭证 · 仓库 · 沙箱</span>
+    </div>
+    <button id="settingsBtn" class="icon-btn" title="打开设置">⚙</button>
+  </header>
+
+  <nav class="tabs">
+    <button type="button" class="tab active" data-tab="credentials">凭证</button>
+    <button type="button" class="tab" data-tab="repositories">仓库</button>
+    <button type="button" class="tab" data-tab="sandbox">沙箱</button>
+  </nav>
+
+  <main class="main">
+    <section id="credentialsSection">
+      <div id="summary" class="summary"></div>
+      <ul id="credCards" class="cred-cards"></ul>
+      <div id="emptyState" class="empty-state hidden">
+        <h2>还没有凭证</h2>
+        <p>请先在设置页添加 GitHub / Gitee / GitLab Token</p>
+        <button id="openOptionsBtn" class="btn primary">打开设置</button>
+      </div>
+    </section>
+
+    <section id="repositoriesSection" class="hidden">
+      <ul id="repoCards" class="cred-cards"></ul>
+      <div id="repoEmptyState" class="empty-state hidden">
+        <h2>还没有仓库</h2>
+        <p>在设置页添加远程仓库地址并关联凭证</p>
+        <button id="openRepoOptionsBtn" class="btn primary">添加仓库</button>
+      </div>
+    </section>
+
+    <section id="sandboxSection" class="hidden">
+      <p class="sandbox-desc">沙箱下载远程归档到扩展内（IndexedDB），可浏览、编辑、新建、删除文件。不写入本地磁盘。</p>
+      <ul id="sandboxCards" class="cred-cards"></ul>
+      <div id="sandboxEmptyState" class="empty-state hidden">
+        <h2>暂无可拉取仓库</h2>
+        <p>请先在设置页添加并验证仓库</p>
+        <button id="openSandboxOptionsBtn" class="btn primary">去配置仓库</button>
+      </div>
+    </section>
+  </main>
+
+  <footer class="footer">
+    <p class="hint">Step 1 凭证 · Step 2 仓库 · Step 3 沙箱拉取 · Step 4 push（开发中）</p>
+  </footer>
+
+  <script type="module" src="panel.js"></script>
+</body>
+</html>
